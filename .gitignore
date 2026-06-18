@@ -4,6 +4,7 @@ venv/
 __pycache__/
 ip102_v1.1/
 vast/
+dataset/
 papers/
 *.pth
 *.json
