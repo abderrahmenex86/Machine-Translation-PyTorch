@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from dataset import TranslationDataset, collate_fn
-from helpers import train, translate_sentence
+from helpers import train
 from tokenizer import BasicTokenizer
 
 
@@ -34,8 +34,8 @@ def get_model(model_type, src_vocab_size, tgt_vocab_size, pad_idx, device):
 
     embed_size = 256
     hidden_size = 512
-    num_layers = 1
-    dropout = 0.7
+    num_layers = 2
+    dropout = 0.3
 
     if model_type == "rnn":
         encoder = EncoderRNN(src_vocab_size, embed_size, hidden_size, num_layers, dropout)
@@ -58,6 +58,8 @@ def get_model(model_type, src_vocab_size, tgt_vocab_size, pad_idx, device):
             nhead=8,
             num_encoder_layers=3,
             num_decoder_layers=3,
+            dim_feedforward=1024,
+            dropout=0.1,
         ).to(device)
     else:
         raise ValueError("Unknown model type")
@@ -81,15 +83,15 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     n_epochs = 50
-    batch_size = 256
+    batch_size = 256 + 128
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print("-> Loading datasets")
-    raw_src_train = read_text_file("dataset/multi30k/train.en")
-    raw_tgt_train = read_text_file("dataset/multi30k/train.fr")
+    raw_src_train = read_text_file("dataset/tatoeba/train.en")
+    raw_tgt_train = read_text_file("dataset/tatoeba/train.fr")
 
-    raw_src_val = read_text_file("dataset/multi30k/val.en")
-    raw_tgt_val = read_text_file("dataset/multi30k/val.fr")
+    raw_src_val = read_text_file("dataset/tatoeba/val.en")
+    raw_tgt_val = read_text_file("dataset/tatoeba/val.fr")
 
     raw_src_train, raw_tgt_train = filter_pairs(raw_src_train, raw_tgt_train, max_len=50)
     raw_src_val, raw_tgt_val = filter_pairs(raw_src_val, raw_tgt_val, max_len=50)
@@ -99,8 +101,8 @@ if __name__ == "__main__":
     tgt_tokenizer = BasicTokenizer(min_freq=2)
 
     print("-> Fitting tokenizers")
-    src_tokenizer.fit(raw_src_train)
-    tgt_tokenizer.fit(raw_tgt_train)
+    src_tokenizer.fit(raw_src_train, max_vocab=15000)
+    tgt_tokenizer.fit(raw_tgt_train, max_vocab=15000)
 
     print(f"English Vocab Size: {len(src_tokenizer)}")
     print(f"French Vocab Size: {len(tgt_tokenizer)}")
@@ -113,10 +115,10 @@ if __name__ == "__main__":
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_fn,
-        num_workers=2,
+        num_workers=4,
         pin_memory=True,
         persistent_workers=True,
-        prefetch_factor=2,
+        prefetch_factor=8,
     )
 
     val_loader = DataLoader(
@@ -127,11 +129,11 @@ if __name__ == "__main__":
         num_workers=2,
         pin_memory=True,
         persistent_workers=True,
-        prefetch_factor=2,
+        prefetch_factor=8,
     )
 
     if args.model == "all":
-        models_to_train = ["rnn", "lstm", "gru", "transformer"]
+        models_to_train = ["transformer", "gru", "lstm", "rnn"]
     else:
         models_to_train = [args.model]
 
