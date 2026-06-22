@@ -6,16 +6,16 @@ from src.factory import build_model
 
 
 @torch.no_grad()
-def run_inference(args, src_tok, tgt_tok, device):
+def run_inference(args, src_tok, tgt_tok, device, run_dir):
     try:
-        src_tok.load_vocab(f"artifacts/src_vocab_{args.tokenizer}.json")
-        tgt_tok.load_vocab(f"artifacts/tgt_vocab_{args.tokenizer}.json")
+        src_tok.load_vocab(os.path.join(run_dir, f"src_vocab_{args.tokenizer}.json"))
+        tgt_tok.load_vocab(os.path.join(run_dir, f"tgt_vocab_{args.tokenizer}.json"))
     except FileNotFoundError:
-        print("[ERROR] Vocab files missing. Please run --mode train first.")
+        print(f"[ERROR] Vocab files missing in {run_dir}. Please run training first.")
         return
 
     model = build_model(args.model, len(src_tok), len(tgt_tok), tgt_tok.PAD, device, **vars(args))
-    weights_path = f"artifacts/best_{args.model}.pth"
+    weights_path = os.path.join(run_dir, f"best_{args.model}.pth")
 
     if not os.path.exists(weights_path):
         print(f"[ERROR] Weights not found at {weights_path}")
@@ -24,7 +24,8 @@ def run_inference(args, src_tok, tgt_tok, device):
     model.load_state_dict(torch.load(weights_path, map_location=device))
     model.eval()
 
-    print(f"\n[INFO] Interactive Mode ({args.model.upper()}) | Type 'q' to quit.")
+    print(f"\n[INFO] Loaded Run: {run_dir}")
+    print(f"[INFO] Interactive Mode ({args.model.upper()}) | Type 'q' to quit.")
     print("=" * 60)
 
     while True:
