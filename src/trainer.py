@@ -1,18 +1,26 @@
 import json
 import math
+import os
 
 import torch
 import torch.nn as nn
 from torchmetrics.text import BLEUScore
+from tqdm import tqdm
 
 from src.factory import build_model
+
+try:
+    from torchinfo import summary
+except ImportError:
+    summary = None
 
 
 def train_epoch(model, loader, criterion, optimizer, device, model_type):
     model.train()
     total_loss, total_samples = 0.0, 0
 
-    for src, tgt in loader:
+    pbar = tqdm(loader, desc="Training", leave=False)
+    for src, tgt in pbar:
         src, tgt = src.to(device, non_blocking=True), tgt.to(device, non_blocking=True)
         optimizer.zero_grad()
 
@@ -36,6 +44,8 @@ def train_epoch(model, loader, criterion, optimizer, device, model_type):
         total_samples += batch_size
         total_loss += loss.item() * batch_size
 
+        pbar.set_postfix({"Loss": f"{loss.item():.4f}"})
+
     return total_loss / total_samples
 
 
@@ -46,7 +56,8 @@ def evaluate(model, loader, criterion, device, model_type, tgt_tok):
     bleu_scorer = BLEUScore().to(device)
     all_preds, all_refs = [], []
 
-    for src, tgt in loader:
+    pbar = tqdm(loader, desc="Evaluating", leave=False)
+    for src, tgt in pbar:
         src, tgt = src.to(device, non_blocking=True), tgt.to(device, non_blocking=True)
         batch_size = src.size(0)
 
@@ -82,17 +93,32 @@ def evaluate(model, loader, criterion, device, model_type, tgt_tok):
     return total_loss / total_samples, bleu_scorer(all_preds, all_refs).item() * 100
 
 
-def run_training(args, train_loader, val_loader, src_tok, tgt_tok, device):
+def run_training(args, train_loader, val_loader, src_tok, tgt_tok, device, run_dir):
     model = build_model(args.model, len(src_tok), len(tgt_tok), tgt_tok.PAD, device, **vars(args))
 
     lr, weight_decay = (1e-4, 1e-4) if args.model == "transformer" else (5e-3, 1e-2)
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_tok.PAD, label_smoothing=0.1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
+    with open(os.path.join(run_dir, "hyperparameters.json"), "w") as f:
+        json.dump(vars(args), f, indent=4)
+
+    if summary is not None:
+        try:
+            dummy_src = torch.randint(0, len(src_tok), (2, 50)).to(device)
+            dummy_tgt = torch.randint(0, len(tgt_tok), (2, 50)).to(device)
+            arch_str = repr(summary(model, input_data=(dummy_src, dummy_tgt), verbose=0))
+            with open(os.path.join(run_dir, "architecture.txt"), "w") as f:
+                f.write(arch_str)
+        except Exception as e:
+            tqdm.write(f"[WARNING] Could not generate architecture.txt: {e}")
+
     history = {"train": {"loss": [], "perplexity": []}, "val": {"loss": [], "perplexity": [], "bleu": []}}
     best_loss = float("inf")
 
-    print(f"\n[INFO] Training {args.model.upper()} | LR: {lr} | Epochs: {args.epochs}")
+    tqdm.write(f"\n[INFO] Run Directory: {run_dir}")
+    tqdm.write(f"[INFO] Training {args.model.upper()} | LR: {lr} | Epochs: {args.epochs}\n")
+
     for epoch in range(1, args.epochs + 1):
         t_loss = train_epoch(model, train_loader, criterion, optimizer, device, args.model)
         v_loss, v_bleu = evaluate(model, val_loader, criterion, device, args.model, tgt_tok)
@@ -103,15 +129,15 @@ def run_training(args, train_loader, val_loader, src_tok, tgt_tok, device):
         history["val"]["perplexity"].append(math.exp(v_loss))
         history["val"]["bleu"].append(v_bleu)
 
-        print(
+        tqdm.write(
             f"Epoch {epoch:02d}/{args.epochs} | Train Loss: {t_loss:.4f} | Val Loss: {v_loss:.4f} | BLEU: {v_bleu:.2f}"
         )
 
         if v_loss < best_loss:
             best_loss = v_loss
-            torch.save(model.state_dict(), f"artifacts/best_{args.model}.pth")
+            torch.save(model.state_dict(), os.path.join(run_dir, f"best_{args.model}.pth"))
 
-    with open(f"artifacts/{args.model}_history.json", "w") as f:
+    with open(os.path.join(run_dir, f"{args.model}_history.json"), "w") as f:
         json.dump(history, f, indent=4)
 
-    print(f"[SUCCESS] Training Complete. History saved to artifacts/{args.model}_history.json")
+    tqdm.write(f"\n[SUCCESS] Run Complete. All artifacts saved to {run_dir}")
