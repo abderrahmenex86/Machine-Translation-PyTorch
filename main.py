@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--model", type=str, required=True, choices=["rnn", "lstm", "gru", "transformer"])
     parser.add_argument("--dataset", type=str, default="dataset/tatoeba")
     parser.add_argument("--tokenizer", type=str, default="basic", choices=["basic"])
-    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=256)
 
     parser.add_argument("--run_dir", type=str, default=None, help="Specific artifacts subfolder to load")
@@ -69,7 +69,6 @@ def main():
     else:
         raise NotImplementedError("Other tokenizers are not yet integrated.")
 
-    # Get the timestamped/latest directory
     is_training = args.mode in ["train", "optimize"]
     run_dir = get_run_dir(args, is_training)
 
@@ -91,7 +90,6 @@ def main():
     src_tok.fit(train_src, max_vocab=15000)
     tgt_tok.fit(train_tgt, max_vocab=15000)
 
-    # Save vocab locally inside the isolated run directory
     if is_training:
         src_tok.save_vocab(os.path.join(run_dir, f"src_vocab_{args.tokenizer}.json"))
         tgt_tok.save_vocab(os.path.join(run_dir, f"tgt_vocab_{args.tokenizer}.json"))
