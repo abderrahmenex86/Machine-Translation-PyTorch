@@ -47,6 +47,7 @@ def main():
     parser.add_argument("--model", type=str, required=True, choices=["rnn", "lstm", "gru", "transformer"])
     parser.add_argument("--dataset", type=str, default="dataset/tatoeba")
     parser.add_argument("--tokenizer", type=str, default="basic", choices=["basic", "bpe", "spm"])
+    parser.add_argument("--vocab_size", type=int, default=2048, help="Vocabulary size")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=256)
 
@@ -71,9 +72,9 @@ def main():
     if args.tokenizer == "basic":
         src_tok, tgt_tok = BasicTokenizer(), BasicTokenizer()
     elif args.tokenizer == "bpe":
-        src_tok, tgt_tok = BPETokenizer(vocab_size=2048), BPETokenizer(vocab_size=2048)
+        src_tok, tgt_tok = BPETokenizer(vocab_size=args.vocab_size), BPETokenizer(vocab_size=args.vocab_size)
     elif args.tokenizer == "spm":
-        src_tok, tgt_tok = SPMTokenizer(vocab_size=2048), SPMTokenizer(vocab_size=2048)
+        src_tok, tgt_tok = SPMTokenizer(vocab_size=args.vocab_size), SPMTokenizer(vocab_size=args.vocab_size)
     else:
         raise NotImplementedError("Other tokenizers are not yet integrated.")
 
@@ -100,14 +101,6 @@ def main():
     print(f"[INFO] Preparing {args.dataset}...")
     (train_src, train_tgt), (val_src, val_tgt) = load_data_lines(args.dataset)
 
-    if args.mode == "optimize":
-        train_src, train_tgt = train_src[:10000], train_tgt[:10000]
-        val_src, val_tgt = val_src[:1000], val_tgt[:1000]
-    elif args.mode == "test":
-        train_src, train_tgt = train_src[:200], train_tgt[:200]
-        val_src, val_tgt = val_src[:50], val_tgt[:50]
-        args.batch_size = min(args.batch_size, 32)
-
     if args.resume:
         print(f"[INFO] Resuming training. Re-loading vocab from {run_dir}...")
         try:
@@ -117,11 +110,19 @@ def main():
             print(f"[ERROR] Cannot resume. Vocabulary files are missing in {run_dir}")
             return
     else:
-        src_tok.fit(train_src, max_vocab=2048)
-        tgt_tok.fit(train_tgt, max_vocab=2048)
+        src_tok.fit(train_src, max_vocab=args.vocab_size)
+        tgt_tok.fit(train_tgt, max_vocab=args.vocab_size)
         if is_training:
             src_tok.save_vocab(os.path.join(run_dir, f"src_vocab_{args.tokenizer}.json"))
             tgt_tok.save_vocab(os.path.join(run_dir, f"tgt_vocab_{args.tokenizer}.json"))
+
+    if args.mode == "optimize":
+        train_src, train_tgt = train_src[:10000], train_tgt[:10000]
+        val_src, val_tgt = val_src[:1000], val_tgt[:1000]
+    elif args.mode == "test":
+        train_src, train_tgt = train_src[:200], train_tgt[:200]
+        val_src, val_tgt = val_src[:50], val_tgt[:50]
+        args.batch_size = min(args.batch_size, 32)
 
     train_loader, val_loader = build_dataloaders(args, (train_src, train_tgt), (val_src, val_tgt), src_tok, tgt_tok)
 

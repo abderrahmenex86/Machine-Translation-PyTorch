@@ -58,7 +58,7 @@ class BasicTokenizer:
 
 
 class BPETokenizer:
-    def __init__(self, vocab_size=8000, min_freq=2):
+    def __init__(self, vocab_size=2048, min_freq=2):
         self.vocab_size = vocab_size
         self.min_freq = min_freq
         self.PAD, self.SOS, self.EOS, self.UNK = 0, 1, 2, 3
@@ -94,7 +94,6 @@ class BPETokenizer:
 
         splits = {tuple(word): freq for word, freq in word_freqs.items()}
 
-        # Added TQDM Progress bar and Fast-Path skipping
         target_merges = self.vocab_size - len(self.word2idx)
         with tqdm(total=target_merges, desc="Training BPE", leave=False) as pbar:
             while len(self.word2idx) < self.vocab_size:
@@ -196,7 +195,7 @@ class BPETokenizer:
 
 
 class SPMTokenizer:
-    def __init__(self, vocab_size=8000):
+    def __init__(self, vocab_size=2048):
         self.vocab_size = vocab_size
         self.PAD, self.SOS, self.EOS, self.UNK = 0, 1, 2, 3
         self.sp = spm.SentencePieceProcessor()
