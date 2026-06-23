@@ -1,7 +1,11 @@
 import json
+import os
 import re
+import shutil
+import uuid
 from collections import Counter
 
+import sentencepiece as spm
 from tqdm import tqdm
 
 
@@ -18,7 +22,7 @@ class BasicTokenizer:
         s = re.sub(r"[^a-zA-ZÀ-ÿ.!?]+", r" ", s)
         return s
 
-    def fit(self, sentences, max_vocab=15000):
+    def fit(self, sentences, max_vocab=2048):
         counter = Counter()
         for sentence in sentences:
             counter.update(self.normalize(sentence).split())
@@ -69,7 +73,7 @@ class BPETokenizer:
         s = re.sub(r"[^a-zA-ZÀ-ÿ.!?]+", r" ", s)
         return s
 
-    def fit(self, sentences, max_vocab=8000):
+    def fit(self, sentences, max_vocab=2048):
         self.vocab_size = max_vocab
 
         word_freqs = Counter()
@@ -189,3 +193,62 @@ class BPETokenizer:
         self.word2idx = state["word2idx"]
         self.idx2word = {int(v): k for k, v in self.word2idx.items()}
         self.merges = [tuple(pair) for pair in state["merges"]]
+
+
+class SPMTokenizer:
+    def __init__(self, vocab_size=8000):
+        self.vocab_size = vocab_size
+        self.PAD, self.SOS, self.EOS, self.UNK = 0, 1, 2, 3
+        self.sp = spm.SentencePieceProcessor()
+        self.prefix = f"spm_tmp_{uuid.uuid4().hex[:8]}"
+
+    def fit(self, sentences, max_vocab=2048, **kwargs):
+        self.vocab_size = max_vocab
+        temp_file = f"{self.prefix}_train.txt"
+
+        with open(temp_file, "w", encoding="utf-8") as f:
+            for s in sentences:
+                f.write(s.lower().strip() + "\n")
+
+        spm.SentencePieceTrainer.train(
+            input=temp_file,
+            model_prefix=self.prefix,
+            vocab_size=self.vocab_size,
+            pad_id=self.PAD,
+            bos_id=self.SOS,
+            eos_id=self.EOS,
+            unk_id=self.UNK,
+            model_type="unigram",
+            character_coverage=0.9995,
+        )
+        self.sp.load(f"{self.prefix}.model")
+
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        if os.path.exists(f"{self.prefix}.vocab"):
+            os.remove(f"{self.prefix}.vocab")
+
+    def encode(self, sentence):
+        return self.sp.encode(sentence.lower().strip(), out_type=int, add_bos=False, add_eos=False)
+
+    def decode(self, indices):
+        indices = indices.tolist() if hasattr(indices, "tolist") else indices
+        if self.EOS in indices:
+            indices = indices[: indices.index(self.EOS)]
+
+        clean_indices = [idx for idx in indices if idx not in (self.PAD, self.SOS)]
+        return self.sp.decode(clean_indices)
+
+    def __len__(self):
+        return self.sp.get_piece_size()
+
+    def save_vocab(self, filepath):
+        filepath = filepath.replace(".json", ".model")
+        shutil.copyfile(f"{self.prefix}.model", filepath)
+
+        if os.path.exists(f"{self.prefix}.model"):
+            os.remove(f"{self.prefix}.model")
+
+    def load_vocab(self, filepath):
+        filepath = filepath.replace(".json", ".model")
+        self.sp.load(filepath)

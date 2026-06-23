@@ -1,7 +1,7 @@
 import os
 
 from src.dataset import build_dataloaders, load_data_lines
-from src.tokenizer import BasicTokenizer, BPETokenizer
+from src.tokenizer import BasicTokenizer, BPETokenizer, SPMTokenizer
 
 
 def run_verification(args):
@@ -10,16 +10,18 @@ def run_verification(args):
     (train_src, train_tgt), _ = load_data_lines(args.dataset, max_len=50)
     train_src, train_tgt = train_src[:1000], train_tgt[:1000]
 
-    # Dynamically select the target tokenizer
     if args.tokenizer == "basic":
         src_tok, tgt_tok = BasicTokenizer(min_freq=2), BasicTokenizer(min_freq=2)
     elif args.tokenizer == "bpe":
-        src_tok, tgt_tok = BPETokenizer(vocab_size=8000), BPETokenizer(vocab_size=8000)
+        src_tok, tgt_tok = BPETokenizer(vocab_size=1024), BPETokenizer(vocab_size=1024)
+    elif args.tokenizer == "spm":
+        src_tok, tgt_tok = SPMTokenizer(vocab_size=1024), SPMTokenizer(vocab_size=1024)
+
     else:
         raise NotImplementedError(f"Tokenizer {args.tokenizer} is not yet supported.")
 
-    src_tok.fit(train_src)
-    tgt_tok.fit(train_tgt)
+    src_tok.fit(train_src, max_vocab=1024)
+    tgt_tok.fit(train_tgt, max_vocab=1024)
 
     train_loader, _ = build_dataloaders(args, (train_src, train_tgt), ([], []), src_tok, tgt_tok)
     train_loader.num_workers = 0

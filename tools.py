@@ -11,7 +11,7 @@ def main():
     parser.add_argument("--mode", type=str, required=True, choices=["download", "verify", "plot"])
     parser.add_argument("--model", type=str, default="all", choices=["all", "rnn", "lstm", "gru", "transformer"])
     parser.add_argument("--dataset", type=str, default="dataset/tatoeba")
-    parser.add_argument("--tokenizer", type=str, default="basic", choices=["basic", "bpe"])
+    parser.add_argument("--tokenizer", type=str, default="basic", choices=["basic", "bpe", "spm"])
     parser.add_argument("--run_dir", type=str, default=None, help="Target run folder for plotting")
     args = parser.parse_args()
 
