@@ -51,7 +51,7 @@ class Transformer(nn.Module):
         self.fc_out = nn.Linear(d_model, tgt_vocab)
 
     def create_mask(self, src, tgt):
-        tgt_mask = nn.Transformer.generate_square_subsequent_mask(tgt.size(1)).to(src.device)
+        tgt_mask = nn.Transformer.generate_square_subsequent_mask(tgt.size(1), device=src.device, dtype=torch.bool)
         src_padding_mask = src == self.pad_idx
         tgt_padding_mask = tgt == self.pad_idx
         return tgt_mask, src_padding_mask, tgt_padding_mask
