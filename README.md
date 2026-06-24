@@ -12,11 +12,11 @@
 This project is an end-to-end Neural Machine Translation (NMT) system built from scratch using PyTorch. It serves as a comparative study evaluating the performance, translation quality, and convergence characteristics of different neural architectures (Vanilla RNN, LSTM, GRU, and Transformer) and tokenization strategies (Word-level, custom Byte-Pair Encoding, and Google's SentencePiece) on the Tatoeba English-French dataset (~230k parallel sentence pairs).
 
 <div align="center">
-  <img src="docs/figs/architectures_comparison.png" width="48%" />
-  <img src="docs/figs/tokenizers_comparison.png" width="48%" />
+  <img src="docs/figs/architectures_comparison.png" width="30%" />
+  <img src="docs/figs/tokenizers_comparison.png" width="60%" />
   <br>
-  <img src="docs/figs/optuna_history.png" width="48%" />
-  <img src="docs/figs/optuna_params.png" width="48%" />
+  <img src="docs/figs/optuna_history.png" width="30%" />
+  <img src="docs/figs/optuna_params.png" width="60%" />
 </div>
 
 ## Features
