@@ -44,7 +44,7 @@ This project is an end-to-end Neural Machine Translation (NMT) system built from
 ## Folder Structure
 
 ```text
-mt_project/
+translation/
 ├── dataset/
 │   └── tatoeba/             # Downloaded parallel train and val splits
 ├── artifacts/               # Run subfolders storing vocab, checkpoints, logs, and params
