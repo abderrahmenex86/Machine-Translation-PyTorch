@@ -36,7 +36,7 @@ Experiment notes and the optimisation history are in
 ## Run it
 
 ```bash
-git clone https://github.com/abderrahmeneex86/translation
+git clone https://github.com/abderrahmenex86/translation
 cd translation
 virtualenv venv --python python3.12
 source venv/bin/activate
