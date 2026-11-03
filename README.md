@@ -1,238 +1,81 @@
 # Machine Translation in PyTorch
 
-<div align="center">
-  <p>
-    <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch" />
-    <img src="https://img.shields.io/badge/Optuna-20232A?style=for-the-badge&logo=python&logoColor=white" alt="Optuna" />
-    <img src="https://img.shields.io/badge/TQDM-FFD700?style=for-the-badge&logo=python&logoColor=black" alt="TQDM" />
-    <img src="https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge&logo=python&logoColor=white" alt="Matplotlib" />
-  </p>
-</div>
+A neural machine translation system written in plain PyTorch, used as a
+comparative study. It trains four architectures (RNN, LSTM, GRU, Transformer)
+against three tokenization strategies (word-level, custom BPE, SentencePiece)
+on the Tatoeba English-French corpus of roughly 230k sentence pairs, and
+records where each combination succeeds and where it does not.
 
-This project is an end-to-end Neural Machine Translation (NMT) system built from scratch using PyTorch. It serves as a comparative study evaluating the performance, translation quality, and convergence characteristics of different neural architectures (Vanilla RNN, LSTM, GRU, and Transformer) and tokenization strategies (Word-level, custom Byte-Pair Encoding, and Google's SentencePiece) on the Tatoeba English-French dataset (~230k parallel sentence pairs).
+![Architecture comparison](docs/figs/architectures_comparison.png)
 
-<div align="center">
-  <img src="docs/figs/architectures_comparison.png" width="30%" />
-  <img src="docs/figs/tokenizers_comparison.png" width="60%" />
-  <br>
-  <img src="docs/figs/optuna_history.png" width="34%" />
-  <img src="docs/figs/optuna_params.png" width="56%" />
-</div>
+## What it does
 
-## Features
+- Trains four encoder-decoder architectures behind one interface, so a run
+  differs only by `--model`.
+- Implements three tokenizers from scratch to measure the out-of-vocabulary
+  problem directly: regex word-level, a pure-Python BPE, and a SentencePiece
+  unigram model.
+- Runs Optuna searches over architectural shape (embedding size, layer counts,
+  feed-forward width) while leaving training hyperparameters fixed.
+- Checkpoints model, optimizer, metric history, and early-stopping counters
+  every epoch. `--resume` reloads the run's vocabulary alongside the weights,
+  since mismatched vocabularies silently corrupt the embedding rows.
+- Reports BLEU through `torchmetrics` and plots the comparisons in `docs/figs`.
 
-- **Custom Tokenization Pipeline**: Implements three separate tokenization strategies to evaluate the out-of-vocabulary (OOV) problem:
-  - A from-scratch basic word-level tokenizer with regex parsing for French accents (`r"[^a-zA-ZÀ-ÿ.!?]+"`).
-  - A custom Byte-Pair Encoding (BPE) tokenizer built in pure Python.
-  - A C++-optimized unigram tokenizer via `sentencepiece`.
-- **Unified NMT Architectures**:
-  - **Recurrent Models**: Consolidates Vanilla RNN, LSTM, and GRU cells into a single, modular Encoder-Decoder pipeline.
-  - **Transformer**: Implements a full self-attention NMT model, including the scaling adjustment ($\sqrt{d_{model}}$) prior to positional encoding addition to prevent representation collapse.
-- **Fault-Tolerant Training**: Checkpoints the model state, optimizer, metrics history, and early-stopping counters at the end of each epoch. The `--resume` flag automatically recovers the matching vocabulary dictionary from the run directory to prevent coordinate-shift weight corruption during preemption recovery.
-- **Hyperparameter Optimization**: Integrates Optuna to search for optimal architectural boundaries (embedding dimensions, layer counts, feed-forward dimensions) while isolating standard training hyperparameters.
+## Samples
 
----
+Seven configurations are recorded side by side in
+[docs/samples.md](docs/samples.md). The word-level RNN repeats the same
+sentence for every prompt, the custom BPE model emits compressed fragments
+(`peu t m voi`), and the SentencePiece Transformer produces complete French
+sentences. None of these models is usable outside the study.
 
-## Tech Stack
+Experiment notes and the optimisation history are in
+[docs/experiments.md](docs/experiments.md).
 
-- **Machine Learning & Frameworks:** PyTorch, Torchmetrics (BLEU Score), Torchinfo, SentencePiece
-- **Hyperparameter Optimization:** Optuna
-- **Tracking & Visualizations:** TQDM, Matplotlib, JSON-based Metrics Logging
+## Run it
 
----
-
-## Folder Structure
-
-```text
-translation/
-├── dataset/
-│   └── tatoeba/             # Downloaded parallel train and val splits
-├── artifacts/               # Run subfolders storing vocab, checkpoints, logs, and params
-├── docs/
-│   └── figs/                # Generated comparative plots and metric charts
-├── src/
-│   ├── tokenizer.py         # BasicTokenizer, BPETokenizer, SPMTokenizer
-│   ├── dataset.py           # Dataset class and optimized multiprocessing DataLoaders
-│   ├── rnns.py              # Unified Recurrent models
-│   ├── transformer.py       # Transformer model & Positional Encoding
-│   ├── factory.py           # Model assembly logic
-│   ├── trainer.py           # Epoch loops and run configurations
-│   ├── optimize.py          # Optuna integration
-│   ├── infer.py             # Autoregressive interactive translation
-│   ├── tester.py            # Gradient & Forward pass checks
-│   └── verify.py            # Dataloader & target slicing checks
-├── main.py                  # CLI Entrypoint for ML Lifecycle (train/test/optimize/infer)
-└── tools.py                 # CLI Entrypoint for Utilities (download/verify/plot)
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-- Python 3.10+
-- A CUDA-capable GPU
-
-### Installation
-
-1. **Clone the repository:**
 ```bash
-git clone https://github.com/abderrahmenex86/translation.git
+git clone https://github.com/abderrahmeneex86/translation
 cd translation
 virtualenv venv --python python3.12
 source venv/bin/activate
 pip install -r requirements.txt
-```
 
-2. **Download and prepare the Tatoeba dataset:**
-```bash
-python tools.py --mode download
-```
-
-3. **Verify dataloaders and target shifts:**
-```bash
+python tools.py --mode download                          # fetch Tatoeba
 python tools.py --mode verify --tokenizer bpe --vocab_size 2000
-```
-
----
-
-## Workflow Guide
-
-### 1. Sanity Checks
-Verify memory layout, model output shapes, and backward gradient flow before committing to long training loops:
-```bash
 python main.py --mode test --model transformer --tokenizer spm
 ```
 
-### 2. Architectural Hyperparameter Sweeps
-Run an Optuna search to optimize model shapes (e.g., layers, embed dimension, hidden size) for a specific architecture. Results and trial histories are dumped to `artifacts/<run_dir>/optuna_summary.json`:
+Python 3.10+ and a CUDA GPU. The verify and test modes run without training
+and are the fastest way to check an install.
+
+## Training
+
 ```bash
+# Optuna sweep over model shape, written to artifacts/<run>/optuna_summary.json
 python main.py --mode optimize --model transformer --tokenizer spm
-```
 
-### 3. Model Training
-Start a standard training run using optimized configurations. Training exits early if the validation loss fails to improve for the specified `--patience` threshold:
-```bash
-python main.py --mode train --model transformer --tokenizer spm --d_model 256 --dim_ff 1024 --num_enc 3 --num_dec 3 --epochs 50 --patience 7
-```
+# Train with an explicit configuration; stops early on val loss
+python main.py --mode train --model transformer --tokenizer spm \
+  --d_model 256 --dim_ff 1024 --num_enc 3 --num_dec 3 --epochs 50 --patience 7
 
-### 4. Resuming Interrupted Runs
-If a training session is interrupted, push your code or log back in and use the `--resume` flag. This automatically locates the latest folder in `artifacts/`, reloads the local vocabulary, and restores the optimizer states:
-```bash
+# Resume the latest run, vocabulary included
 python main.py --mode train --model transformer --resume
-```
-*(Optionally, target a specific run using `--run_dir artifacts/<specific_folder>`)*
 
-### 5. Interactive Inference
-Test the model’s auto-regressive generation interactively via the terminal:
-```bash
+# Translate interactively
 python main.py --mode infer --model transformer
 ```
 
-## Translation Samples
+## How it works
 
-```text
-Settings: Model=RNN | Tokenizer=BASIC | Vocab=8000
+`main.py` dispatches train, test, optimize, and infer. `tools.py` handles
+dataset download, dataloader verification, and plotting. Model construction
+lives in `src/factory.py`, so the tokenizer and architecture are chosen at the
+CLI and assembled in one place. See [docs/architecture.md](docs/architecture.md)
+for the module map and the attention and positional-encoding details.
 
-English > can you see me?
-French  > je ne que pas .
+## Stack
 
-English > i don't know why
-French  > je ne que pas .
-
-English > Hello world
-French  > je ne que pas .
-
-English > Two men running in a bike
-French  > je ne que pas .
-
-
-Settings: Model=LSTM | Tokenizer=BASIC | Vocab=8000
-
-English > can you see me?
-French  > est ce que tu peux me voir ?
-
-English > i don't know why
-French  > de la plus vieille .
-
-English > Hello world
-French  > <UNK> le monde .
-
-English > Two men running in a bike
-French  > il y a un dictionnaire en
-
-
-Settings: Model=GRU | Tokenizer=BASIC | Vocab=8000
-
-English > can you see me?
-French  > peux tu me voir ?
-
-English > i don't know why
-French  > je ignore pourquoi .
-
-English > Hello world
-French  > bonjour à monde .
-
-English > Two men running in a bike
-French  > deux hommes en font .
-
-
-Settings: Model=TRANSFORMER | Tokenizer=BASIC | Vocab=8000
-
-English > can you see me?
-French  > peux tu me voir ?
-
-English > i don't know why
-French  > j ignore pourquoi .
-
-English > Hello world
-French  > bonjour .
-
-English > Two men running in a bike
-French  > deux hommes courent en vélo .
-
-
-Settings: Model=LSTM | Tokenizer=BPE | Vocab=8000
-
-English > can you see me?
-French  > peu t m voi
-
-English > i don't know why
-French  > qu j n sai pa
-
-English > Hello world
-French  > l bell
-
-English > Two men running in a bike
-French  > le homme dormen e u u
-
-
-Settings: Model=LSTM | Tokenizer=SPM | Vocab=8000
-
-English > can you see me?
-French  > peux-tu me voir ?
-
-English > i don't know why
-French  > je ne sais pas.
-
-English > Hello world
-French  > épagne.
-
-English > Two men running in a bike
-French  > deux hommes travaillent du.
-
-
-Settings: Model=TRANSFORMER | Tokenizer=SPM | Vocab=8000
-
-English > can you see me?
-French  > peux-tu me voir ?
-
-English > i don't know why
-French  > je ne sais pas pourquoi je suis au courant.
-
-English > Hello world
-French  > il élodia le monde.
-
-English > Two men running in a bike
-French  > deux hommes courent en vélo.
-```
+Python 3.12 · PyTorch · torchmetrics (BLEU) · SentencePiece · Optuna ·
+Matplotlib · TQDM
