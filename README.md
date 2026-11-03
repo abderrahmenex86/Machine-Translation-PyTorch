@@ -36,8 +36,8 @@ Experiment notes and the optimisation history are in
 ## Run it
 
 ```bash
-git clone https://github.com/abderrahmenex86/translation
-cd translation
+git clone https://github.com/abderrahmenex86/Machine-Translation-PyTorch
+cd Machine-Translation-PyTorch
 virtualenv venv --python python3.12
 source venv/bin/activate
 pip install -r requirements.txt
