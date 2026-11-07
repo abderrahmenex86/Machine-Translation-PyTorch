@@ -25,15 +25,17 @@ _The four word-level runs from the results table. The Transformer reaches 52.54 
 
 BLEU numbers are corpus BLEU-4 from `torchmetrics.text.BLEUScore`, computed on the validation split and multiplied by 100. `src/trainer.py` evaluates after every epoch with greedy decoding capped at 50 tokens. Each row gives the highest BLEU the run logged, with the epoch in parentheses, and the lowest validation loss with its epoch.
 
-| Model | Tokenizer | Vocabulary (src / tgt) | Best val BLEU (epoch) | Lowest val loss (epoch) | Run directory under `artifacts/` |
-| --- | --- | --- | --- | --- | --- |
-| RNN | basic | 11,426 / 15,000 | 1.11 (27) | 6.1792 (35) | `20260623_030156_rnn_emb128_hid256_lyr1` |
-| LSTM | basic | 11,426 / 15,000 | 42.05 (50) | 3.3096 (47) | `20260623_044526_lstm_emb128_hid256_lyr2` |
-| GRU | basic | 11,426 / 15,000 | 41.49 (45) | 3.3760 (38) | `20260623_065034_gru_emb128_hid512_lyr1` |
-| Transformer | basic | 11,426 / 15,000 | 52.54 (50) | 2.0278 (21) | `20260622_234031_transformer_d512_h4_e4_d5` |
-| LSTM | BPE | 15,000 / 15,000 | 40.17 (50) | 3.4212 (46) | `20260623_182322_lstm_emb512_hid256_lyr3` |
-| LSTM | SPM | 2,048 / 2,048 | 32.16 (35) | 3.8654 (30) | `20260623_225636_lstm_emb256_hid512_lyr4` |
-| Transformer | SPM | 2,048 / 2,048 | 46.27 (44) | 1.7883 (39) | `20260624_100125_transformer_d512_h8_e2_d4` |
+| Model | Tokenizer | Vocabulary (src / tgt) | Best val BLEU (epoch) | Lowest val loss (epoch) |
+| --- | --- | --- | --- | --- |
+| RNN | basic | 11,426 / 15,000 | 1.11 (27) | 6.1792 (35) |
+| LSTM | basic | 11,426 / 15,000 | 42.05 (50) | 3.3096 (47) |
+| GRU | basic | 11,426 / 15,000 | 41.49 (45) | 3.3760 (38) |
+| Transformer | basic | 11,426 / 15,000 | 52.54 (50) | 2.0278 (21) |
+| LSTM | BPE | 15,000 / 15,000 | 40.17 (50) | 3.4212 (46) |
+| LSTM | SPM | 2,048 / 2,048 | 32.16 (35) | 3.8654 (30) |
+| Transformer | SPM | 2,048 / 2,048 | 46.27 (44) | 1.7883 (39) |
+
+These numbers come from the `*_history.json` files in the seven run directories under `artifacts/`; the directories are gitignored.
 
 `best_<model>.pth` is written when validation loss improves, not when BLEU improves, so the checkpoint corresponds to the lowest-loss epoch in the table. For the word-level Transformer that is epoch 21, not the epoch-50 model that logged 52.54; the epoch-50 weights were not kept. Every row has this mismatch. `checkpoint.pth` survives only for the three later runs in my directory.
 
@@ -182,30 +184,9 @@ No standalone evaluation command exists. BLEU is computed inside `src/trainer.py
 
 Five stages make up the pipeline: prepare the corpus, fit a tokenizer, build the model, train with per-epoch validation, and decode greedily for inference. `main.py` is the CLI; `tools.py` handles data and verification.
 
-```mermaid
-flowchart LR
-  subgraph Data
-    Raw[("Tatoeba en/fr")]
-    Split["train / val split"]
-  end
-  subgraph Prep
-    Tok["Tokenizer fit and encode"]
-    Pad["SOS / EOS and batch padding"]
-  end
-  subgraph Model
-    Emb["Embedding and positional encoding"]
-    Net["RNN, LSTM, GRU, or Transformer"]
-    Head["Linear projection"]
-  end
-  subgraph Train
-    Loss["Cross-entropy and AdamW"]
-    Eval["Greedy decode and BLEU"]
-    Save["checkpoint and best weights"]
-  end
-  Raw --> Split --> Tok --> Pad --> Emb --> Net --> Head
-  Head --> Loss --> Save
-  Head --> Eval --> Save
-```
+![Translation pipeline from Tatoeba corpus through tokenizer, model, training, and inference](docs/figs/pipeline.png)
+
+_Pipeline stages from corpus to greedy decode. The Mermaid source is `docs/figs/pipeline.mmd`; the rendered image has a fixed white background._
 
 **Corpus.** `tools.py --mode download` calls `src/helpers.download_dataset`. It downloads `fra-eng.zip`, extracts `fra.txt`, shuffles with seed 42, holds out 10,000 pairs, and writes the four split files. `src/dataset.load_data_lines` filters to 50 words per side and returns the train and validation lists.
 
@@ -237,7 +218,7 @@ Training runs in a single process without mixed precision, gradient accumulation
 | `src/verify.py` | dataloader and target-shift checks |
 | `src/helpers.py` | dataset download and metric plots |
 | `docs/samples.md` | recorded translations from an earlier sweep |
-| `docs/figs/` | comparison charts |
+| `docs/figs/` | comparison charts and the pipeline diagram |
 | `dataset/` | downloaded data, gitignored |
 | `artifacts/` | run outputs, gitignored |
 

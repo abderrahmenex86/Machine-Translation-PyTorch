@@ -1,0 +1,22 @@
+flowchart LR
+  subgraph Data
+    Raw[("Tatoeba en/fr")]
+    Split["train / val split"]
+  end
+  subgraph Prep
+    Tok["Tokenizer fit and encode"]
+    Pad["SOS / EOS and batch padding"]
+  end
+  subgraph Model
+    Emb["Embedding and positional encoding"]
+    Net["RNN, LSTM, GRU, or Transformer"]
+    Head["Linear projection"]
+  end
+  subgraph Train
+    Loss["Cross-entropy and AdamW"]
+    Eval["Greedy decode and BLEU"]
+    Save["checkpoint and best weights"]
+  end
+  Raw --> Split --> Tok --> Pad --> Emb --> Net --> Head
+  Head --> Loss --> Save
+  Head --> Eval --> Save
